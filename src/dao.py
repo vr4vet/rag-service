@@ -1,8 +1,15 @@
 
 from abc import ABC, abstractmethod
-from context import Context
 from pymongo import MongoClient
 import logging
+
+from src.context import Context
+from src.config import (
+    RAG_DATABASE_SYSTEM,
+    MONGODB_URI,
+    MONGODB_COLLECTION,
+    MONGODB_DATABASE,
+)
 
 
 class Database(ABC):
@@ -23,7 +30,10 @@ class Database(ABC):
         )
     
     @abstractmethod
-    def get_context(self, document_name: str, embedding: list[float]) -> list[Context]:
+    def get_context(self, 
+        document_name: str, 
+        embedding: list[float]
+    ) -> list[Context]:
         """
         Get context from database
 
@@ -50,10 +60,10 @@ class Database(ABC):
 
         Args:
             text (str): The text to be posted
-            embedding (list[float]): The embedding of the question
+            embedding (list[float]): The embedding
 
         Returns:
-            bool: True if the curriculum was posted, False otherwise
+            bool: if the context was posted
         """
         pass
     
@@ -69,9 +79,6 @@ class Database(ABC):
     
     
     
-# ===================================================================================
-# KOK
-# ===================================================================================
 
 
 class MongoDB(Database):
@@ -91,8 +98,7 @@ class MongoDB(Database):
                 "index": "embeddings",
                 "path": "embedding",
                 "queryVector": embedding,
-                # MongoDB suggests using numCandidates=10*limit or numCandidates=20*limit
-                "numCandidates": 30,
+                "numCandidates": 30, # numCandidates = 10 * limit
                 "limit": 3,
             }
         }
@@ -136,13 +142,10 @@ class MongoDB(Database):
         document_id: str,
     ) -> bool:
         if not text:
-            raise ValueError("Curriculum cannot be None")
-
-        if document_name is None:
-            raise ValueError("Paragraph number cannot be None")
-
+            raise ValueError("text cannot be None")
+        
         if NPC is None:
-            raise ValueError("Page number cannot be None")
+            raise ValueError("NPC cannot be None")
         
         if not document_name:
             raise ValueError("Document name cannot be None")
