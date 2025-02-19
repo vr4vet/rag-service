@@ -1,6 +1,9 @@
 
 from abc import ABC, abstractmethod
 from context import Context
+from pymongo import MongoClient
+import logging
+
 
 class Database(ABC):
     """
@@ -78,8 +81,7 @@ class MongoDB(Database):
         self.collection = self.db[MONGODB_COLLECTION]
         self.similarity_threshold = 0.7
 
-    def get_curriculum(self, document_id: str, embedding: list[float]) -> list[Page]:
-        # Checking if embedding consists of decimals or "none"
+    def get_context(self, document_id: str, embedding: list[float]) -> list[Context]:
         if not embedding:
             raise ValueError("Embedding cannot be None")
 
@@ -101,7 +103,7 @@ class MongoDB(Database):
         if not documents:
             raise ValueError("No documents found")
 
-        # Convert the documents to a list
+        # Convert to list
         documents = list(documents)
 
         results = []
@@ -112,78 +114,49 @@ class MongoDB(Database):
                 continue
 
             if (
-                cosine_similarity(embedding, document["embedding"])
+                similarity_search(embedding, document["embedding"])
                 > self.similarity_threshold
             ):
                 results.append(
-                    Page(
+                    Context(
                         text=document["text"],
-                        page_num=document["pageNum"],
                         document_name=document["documentName"],
+                        NPC=document["NPC"],
                     )
                 )
 
         return results
 
-    def get_page_range(
-        self, document_id: str, page_num_start: int, page_num_end: int
-    ) -> list[Page]:
-        # Get the curriculum from the database
-        cursor = self.collection.find(
-            {
-                "documentId": document_id,
-                "pageNum": {"$gte": page_num_start, "$lte": page_num_end},
-            }
-        )
-
-        if not cursor:
-            raise ValueError("No documents found")
-
-        results = []
-
-        for document in cursor:
-            results.append(
-                Page(
-                    text=document["text"],
-                    page_num=document["pageNum"],
-                    document_name=document["documentName"],
-                )
-            )
-
-        return results
-
     def post_curriculum(
         self,
-        curriculum: str,
-        page_num: int,
-        predicted_page_number: int,
+        text: str,
         document_name: str,
+        NPC: int,
         embedding: list[float],
         document_id: str,
     ) -> bool:
-        if not curriculum:
+        if not text:
             raise ValueError("Curriculum cannot be None")
-
-        if page_num is None:
-            raise ValueError("Page number cannot be None")
 
         if document_name is None:
             raise ValueError("Paragraph number cannot be None")
 
-        if not embedding:
-            raise ValueError("Embedding cannot be None")
-
+        if NPC is None:
+            raise ValueError("Page number cannot be None")
+        
         if not document_name:
             raise ValueError("Document name cannot be None")
+        
+        if not embedding:
+            raise ValueError("Embedding cannot be None")
 
         try:
             # Insert the curriculum into the database with metadata
             self.collection.insert_one(
                 {
-                    "text": curriculum,
-                    "pageNum": page_num,
-                    "predictedPageNumber": predicted_page_number,
+                    "text": text,
                     "documentName": document_name,
+                    "NPC": NPC,
                     "embedding": embedding,
                     "documentId": document_id,
                 }
@@ -226,7 +199,7 @@ class MockDatabase(Database):
             self.similarity_threshold = 0.7
             self.initialized = True
 
-    def get_curriculum(self, document_name: str, embedding: list[float]) -> list[Page]:
+    def get_curriculum(self, document_name: str, embedding: list[float]) -> list[Context]:
         if not embedding:
             raise ValueError("Embedding cannot be None")
 
@@ -235,36 +208,16 @@ class MockDatabase(Database):
         # Filter documents based on similarity and document_name
         for document in self.data:
             if document["document_name"] == document_name:
-                similarity = cosine_similarity(embedding, document["embedding"])
+                similarity = similarity_search(embedding, document["embedding"])
                 if similarity > self.similarity_threshold:
                     results.append(
-                        Page(
+                        Context(
                             text=document["text"],
-                            page_num=document["page_num"],
                             document_name=document["document_name"],
+                            NPC=document["NPC"],
                         )
                     )
-        return results
-
-    def get_page_range(
-        self, document_id: str, page_num_start: int, page_num_end: int
-    ) -> list[Page]:
-        results = []
-
-        # Filter documents based on document_name and page range
-        for document in self.data:
-            if (
-                document["document_id"] == document_id
-                and page_num_start <= document["page_num"] <= page_num_end
-            ):
-                results.append(
-                    Page(
-                        text=document["text"],
-                        page_num=document["page_num"],
-                        document_name=document["document_name"],
-                    )
-                )
-        return results
+        return results 
 
     def post_curriculum(
         self,
