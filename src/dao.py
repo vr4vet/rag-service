@@ -66,6 +66,7 @@ class Database(ABC):
         Returns:
             bool: if the context was posted
         """
+    
         pass
     
     @abstractmethod
