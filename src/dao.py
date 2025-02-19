@@ -4,6 +4,7 @@ from pymongo import MongoClient
 import logging
 
 from src.context import Context
+from src.embeddings import similarity_search 
 from src.config import (
     RAG_DATABASE_SYSTEM,
     MONGODB_URI,
@@ -133,7 +134,7 @@ class MongoDB(Database):
 
         return results
 
-    def post_curriculum(
+    def post_context(
         self,
         text: str,
         document_name: str,
